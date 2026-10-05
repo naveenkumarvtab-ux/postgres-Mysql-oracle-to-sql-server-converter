@@ -26,15 +26,36 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
         })
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status} ${response.statusText}`);
+        } else {
+          throw new Error('Server returned an empty or non-JSON response.');
+        }
+      }
+
       if (!response.ok) {
-        throw new Error(data.error || 'Connection failed');
+        throw new Error(data.error || data.message || `Connection failed (HTTP ${response.status})`);
       }
 
       setTestResult({ success: true, message: 'Connection successful', info: data.serverInfo || 'SQL Server connected' });
       onUpdateConfig({ ...config, isConnected: true, serverInfo: data.serverInfo || 'SQL Server' });
     } catch (err) {
-      setTestResult({ success: false, message: err.message || 'Connection failed' });
+      let msg = err.message || 'Connection failed';
+      if (msg === 'Failed to fetch') {
+        const isHttps = window.location.protocol === 'https:';
+        if (isHttps) {
+          msg = 'Failed to connect to local backend (http://127.0.0.1:3001). Web browsers block http:// connections from https:// live sites (Mixed Content restriction). To fix: (1) Ensure local backend is running (cd server && node index.js), AND (2) In Chrome/Edge, click the tune/lock icon in the address bar -> Site settings -> Set "Insecure content" to "Allow". Alternatively, run the app locally at http://localhost:5173/';
+        } else {
+          msg = 'Failed to connect to local backend server at http://127.0.0.1:3001. Please ensure the backend Node server is running on your machine (cd server && npm run dev).';
+        }
+      } else if (msg.includes('Unexpected end of JSON input')) {
+        msg = 'Backend server returned an invalid or empty response. Please verify Node backend is running (cd server && node index.js) and check server console for SQL connection details.';
+      }
+      setTestResult({ success: false, message: msg });
       onUpdateConfig({ ...config, isConnected: false, serverInfo: null });
     } finally {
       setIsTesting(false);
@@ -55,7 +76,11 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
       if (!response.ok) throw new Error(data.error || 'Pruning failed');
       setPruneResult({ success: true, message: data.message });
     } catch (err) {
-      setPruneResult({ success: false, message: err.message || 'Pruning failed' });
+      let msg = err.message || 'Pruning failed';
+      if (msg === 'Failed to fetch') {
+        msg = 'Failed to connect to local backend server at http://127.0.0.1:3001. Ensure the Node backend (server/index.js) is running locally.';
+      }
+      setPruneResult({ success: false, message: msg });
     } finally {
       setIsPruning(false);
     }
