@@ -86,8 +86,25 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
     }
   };
 
+  const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
   return (
     <div className="sql-config-section">
+      {!isLocalDev && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem',
+          borderRadius: 'var(--radius-sm)',
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          color: '#3b82f6',
+          fontSize: '0.82rem',
+          lineHeight: '1.4'
+        }}>
+          💡 <strong>Cloud Host Notice:</strong> Direct database connection to your local SQL Server (and <code>.BAK</code> exports to <code>C:\...</code>) requires running the app locally at <code>http://localhost:5173</code>. On live cloud hosts, use <strong>Download Combined SQL</strong> or <strong>Download ZIP</strong> to execute conversion scripts on your database.
+        </div>
+      )}
+
       <div className="input-group">
         <label htmlFor="sql-server-address">Server Address</label>
         <input
