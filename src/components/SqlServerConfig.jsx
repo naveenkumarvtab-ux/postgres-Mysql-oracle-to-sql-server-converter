@@ -14,6 +14,17 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
+
+    if (!isLocalDev) {
+      setTestResult({
+        success: false,
+        message: 'Direct SQL Server connection & .BAK exports require running the app locally at http://localhost:5173. On live cloud sites (HTTPS), web browsers block connections to local http://127.0.0.1:3001 endpoints. Please use "Download Combined SQL" or "Download ZIP" to execute conversion scripts on your database, or run the app locally.'
+      });
+      onUpdateConfig({ ...config, isConnected: false, serverInfo: null });
+      setIsTesting(false);
+      return;
+    }
+
     try {
       const response = await fetch(getApiUrl('/api/connection/test'), {
         method: 'POST',
@@ -33,7 +44,7 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
         if (!response.ok) {
           throw new Error(`Server returned HTTP ${response.status} ${response.statusText}`);
         } else {
-          throw new Error('Server returned an empty or non-JSON response.');
+          throw new Error('Failed to connect to local Node backend server (http://127.0.0.1:3001). Please ensure backend is running (cd server && npm run dev).');
         }
       }
 
@@ -46,14 +57,7 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
     } catch (err) {
       let msg = err.message || 'Connection failed';
       if (msg === 'Failed to fetch') {
-        const isHttps = window.location.protocol === 'https:';
-        if (isHttps) {
-          msg = 'Failed to connect to local backend (http://127.0.0.1:3001). Web browsers block http:// connections from https:// live sites (Mixed Content restriction). To fix: (1) Ensure local backend is running (cd server && node index.js), AND (2) In Chrome/Edge, click the tune/lock icon in the address bar -> Site settings -> Set "Insecure content" to "Allow". Alternatively, run the app locally at http://localhost:5173/';
-        } else {
-          msg = 'Failed to connect to local backend server at http://127.0.0.1:3001. Please ensure the backend Node server is running on your machine (cd server && npm run dev).';
-        }
-      } else if (msg.includes('Unexpected end of JSON input')) {
-        msg = 'Backend server returned an invalid or empty response. Please verify Node backend is running (cd server && node index.js) and check server console for SQL connection details.';
+        msg = 'Failed to connect to local backend server at http://127.0.0.1:3001. Please ensure the backend Node server is running on your machine (cd server && npm run dev).';
       }
       setTestResult({ success: false, message: msg });
       onUpdateConfig({ ...config, isConnected: false, serverInfo: null });
@@ -66,6 +70,15 @@ export default function SqlServerConfig({ config, onUpdateConfig }) {
     if (!window.confirm("Are you sure you want to drop all temporary 'Migration_' databases from this SQL Server?")) {
       return;
     }
+
+    if (!isLocalDev) {
+      setPruneResult({
+        success: false,
+        message: 'Pruning temporary databases requires running the app locally at http://localhost:5173.'
+      });
+      return;
+    }
+
     setIsPruning(true);
     setPruneResult(null);
     try {
